@@ -333,7 +333,7 @@ tail -f /path/to/wordpress/wp-content/debug.log | grep "WpPost2GitHubMarkdown"
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/wppost2githubmarkdown.git
+git clone https://github.com/gl0bal01/wordpress-plugins/wppost2githubmarkdown.git
 
 # Install development dependencies (if added in future)
 composer install --dev
