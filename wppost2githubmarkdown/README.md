@@ -82,7 +82,7 @@ Sync Interval: hourly (recommended)
 2. Check the "**Sync Status**" table for any errors
 3. Verify files appear in your GitHub repository under `/posts/`
 
-### Step 4: Enable Bidirectional Sync (Optional) !NOT RECOMMENDED. KNOW WHAT YOU DO!
+### Step 4: Enable Bidirectional Sync (Optional)
 
 1. **Enable bidirectional sync** in the plugin settings
 2. **Generate a webhook secret** for security
@@ -344,7 +344,7 @@ composer install --dev
 
 ## 📝 License
 
-This project is licensed under the GPL v2 or later - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GPL v3 or later - see the [LICENSE](LICENSE) file for details.
 
 ## 💖 Acknowledgments
 
