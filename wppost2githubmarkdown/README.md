@@ -292,7 +292,7 @@ do_action('wppost2githubmarkdown_cron');
 - **Memory Efficient**: Minimal memory footprint during sync operations
 - **No Frontend Impact**: Zero impact on site performance for visitors
 
-## 🔄 Bidirectional Sync. !NOT RECOMMENDED: KNOW WHAT YOU DO!
+## 🔄 Bidirectional Sync. (Not recommended)
 
 The plugin now supports **bidirectional synchronization**! When you edit markdown files directly on GitHub, the changes will automatically sync back to your WordPress posts.
 
