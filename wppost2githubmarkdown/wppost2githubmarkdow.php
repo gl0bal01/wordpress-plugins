@@ -5,7 +5,7 @@
  * Description: Automatically sync WordPress posts to GitHub as markdown files using cronjobs with bidirectional sync support.
  * Version: 1.0.0
  * Author: Your Name
- * Author URI: https://yourwebsite.com
+ * Author URI: https://gl0bal01.com
  * License: GPL v3 or later
  * License URI: https://www.gnu.org/licenses/gpl-3.0.html
  * Text Domain: wppost2githubmarkdown
