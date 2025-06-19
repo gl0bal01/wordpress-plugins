@@ -1,0 +1,343 @@
+/**
+ * Blacklist Word Checker CSS - Refactored Version
+ * 
+ * Enhanced styling with better accessibility, responsive design,
+ * and improved visual hierarchy.
+ * 
+ * @package BlacklistWordChecker
+ * @since   1.0.0
+ */
+
+/* === Meta Box Styles === */
+#blacklist-checker-results {
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.blacklist-checking {
+    color: #646970;
+    font-style: italic;
+    margin: 0;
+    padding: 8px 0;
+}
+
+.blacklist-warning {
+    background-color: #fcf2f2;
+    border: 1px solid #f087858a;
+    border-left: 4px solid #d63638;
+    border-radius: 3px;
+    padding: 12px;
+    margin: 10px 0;
+    animation: slideIn 0.3s ease-out;
+}
+
+.blacklist-warning p {
+    margin: 0 0 8px 0;
+    color: #d63638;
+    font-weight: 600;
+}
+
+.blacklist-warning p:last-child {
+    margin-bottom: 0;
+}
+
+.blacklist-success {
+    background-color: #f0f6fc;
+    border: 1px solid #c3dafe;
+    border-left: 4px solid #2271b1;
+    border-radius: 3px;
+    color: #1d2327;
+    margin: 10px 0;
+    padding: 12px;
+    animation: slideIn 0.3s ease-out;
+}
+
+.blacklist-error {
+    background-color: #fcf2f2;
+    border: 1px solid #f087858a;
+    border-left: 4px solid #d63638;
+    border-radius: 3px;
+    color: #d63638;
+    margin: 10px 0;
+    padding: 12px;
+    animation: slideIn 0.3s ease-out;
+}
+
+.blacklist-section-title {
+    font-weight: 600;
+    margin: 12px 0 6px 0;
+    color: #1d2327;
+    border-bottom: 1px solid #dcdcde;
+    padding-bottom: 4px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#blacklist-checker-results ul {
+    margin: 6px 0 10px 16px;
+    list-style-type: disc;
+    color: #50575e;
+}
+
+#blacklist-checker-results ul li {
+    margin-bottom: 4px;
+    padding-left: 4px;
+}
+
+#blacklist-checker-results ul li strong {
+    color: #d63638;
+    font-weight: 600;
+}
+
+/* === Admin Page Styles === */
+.blacklist-manager-container {
+    margin-top: 20px;
+    max-width: 1200px;
+}
+
+.blacklist-add-word-form {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+    margin-bottom: 30px;
+    padding: 20px;
+}
+
+.blacklist-add-word-form h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #1d2327;
+    font-size: 18px;
+}
+
+.blacklist-add-word-form form {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.blacklist-add-word-form input[type="text"] {
+    min-width: 300px;
+    max-width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #8c8f94;
+    border-radius: 3px;
+    font-size: 14px;
+    transition: border-color 0.15s ease-in-out;
+}
+
+.blacklist-add-word-form input[type="text"]:focus {
+    border-color: #2271b1;
+    outline: 2px solid #2271b1;
+    outline-offset: -2px;
+}
+
+.blacklist-current-words {
+    margin-bottom: 30px;
+}
+
+.blacklist-current-words h2 {
+    color: #1d2327;
+    margin-bottom: 15px;
+}
+
+.blacklist-current-words table {
+    max-width: 600px;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.blacklist-current-words table th {
+    background: #f6f7f7;
+    color: #1d2327;
+    font-weight: 600;
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #c3c4c7;
+}
+
+.blacklist-current-words table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f0f0f1;
+    vertical-align: middle;
+}
+
+.blacklist-current-words table tr:last-child td {
+    border-bottom: none;
+}
+
+.blacklist-current-words table tr:hover {
+    background-color: #f6f7f7;
+}
+
+.delete-word {
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 13px;
+    transition: all 0.15s ease-in-out;
+}
+
+.delete-word:hover {
+    background-color: #d63638;
+    color: #fff !important;
+    text-decoration: none;
+}
+
+.delete-word:focus {
+    outline: 2px solid #d63638;
+    outline-offset: 2px;
+}
+
+.blacklist-import-export {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+    margin-top: 30px;
+    padding: 20px;
+}
+
+.blacklist-import-export h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #1d2327;
+}
+
+.blacklist-export,
+.blacklist-import {
+    margin-bottom: 25px;
+}
+
+.blacklist-export:last-child,
+.blacklist-import:last-child {
+    margin-bottom: 0;
+}
+
+.blacklist-export h3,
+.blacklist-import h3 {
+    color: #1d2327;
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.blacklist-export p,
+.blacklist-import p {
+    margin-bottom: 10px;
+    color: #50575e;
+}
+
+.blacklist-export textarea,
+.blacklist-import textarea {
+    font-family: Consolas, Monaco, monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    resize: vertical;
+    min-height: 120px;
+    border: 1px solid #8c8f94;
+    border-radius: 3px;
+    transition: border-color 0.15s ease-in-out;
+}
+
+.blacklist-export textarea:focus,
+.blacklist-import textarea:focus {
+    border-color: #2271b1;
+    outline: 2px solid #2271b1;
+    outline-offset: -2px;
+}
+
+.blacklist-import .submit {
+    margin-top: 15px;
+}
+
+.blacklist-import .description {
+    color: #646970;
+    font-style: italic;
+    margin-left: 10px;
+}
+
+/* === Animations === */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* === Responsive Design === */
+@media screen and (max-width: 782px) {
+    .blacklist-add-word-form form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .blacklist-add-word-form input[type="text"] {
+        min-width: 0;
+        margin-bottom: 10px;
+    }
+    
+    .blacklist-current-words table,
+    .blacklist-current-words table th,
+    .blacklist-current-words table td {
+        padding: 8px 10px;
+        font-size: 14px;
+    }
+}
+
+@media screen and (max-width: 600px) {
+    .blacklist-manager-container {
+        margin: 10px 0;
+    }
+    
+    .blacklist-add-word-form,
+    .blacklist-import-export {
+        padding: 15px;
+    }
+    
+    .blacklist-current-words table {
+        font-size: 13px;
+    }
+}
+
+/* === Accessibility Improvements === */
+@media (prefers-reduced-motion: reduce) {
+    .blacklist-warning,
+    .blacklist-success,
+    .blacklist-error {
+        animation: none;
+    }
+    
+    .delete-word,
+    .blacklist-export textarea,
+    .blacklist-import textarea,
+    .blacklist-add-word-form input[type="text"] {
+        transition: none;
+    }
+}
+
+/* === High Contrast Mode === */
+@media (prefers-contrast: high) {
+    .blacklist-warning {
+        background-color: #fff;
+        border-color: #d63638;
+    }
+    
+    .blacklist-success {
+        background-color: #fff;
+        border-color: #00a32a;
+    }
+    
+    .blacklist-error {
+        background-color: #fff;
+        border-color: #d63638;
+    }
+}
