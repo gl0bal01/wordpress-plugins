@@ -13,6 +13,8 @@
  * Requires at least: 5.0
  * Tested up to: 6.4
  * Requires PHP: 7.4
+ * Network: false
+ * Update URI: false
  */
 
 // Prevent direct access

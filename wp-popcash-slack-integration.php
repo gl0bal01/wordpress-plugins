@@ -14,6 +14,8 @@
  * Tested up to: 6.4
  * Requires PHP: 7.4
  * Created: 2024-02-01
+ * Network: false
+ * Update URI: false
  * Doc: https://docs-api.popcash.net/
  * 
  * SETUP INSTRUCTIONS:
