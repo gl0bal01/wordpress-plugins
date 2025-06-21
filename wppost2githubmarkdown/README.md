@@ -33,7 +33,7 @@ A lightweight, secure WordPress plugin that automatically syncs your blog posts 
 1. **Download** or clone this repository to your WordPress plugins directory:
    ```bash
    cd wp-content/plugins/
-   git clone https://github.com/gl0bal01/worpress-plugins/wppost2githubmarkdown.git
+   git clone https://github.com/gl0bal01/worpress-plugins.git
    ```
 
 2. **Activate** the plugin in WordPress Admin → Plugins
