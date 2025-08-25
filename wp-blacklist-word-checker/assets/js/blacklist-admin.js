@@ -78,8 +78,16 @@
                         return false;
                     }
                     
-                    // Check for invalid characters
-                    if (!/^[\w\s\-']+$/u.test(word)) {
+                    // DEBUG: Log the word being validated
+                    console.log('Validating word:', word);
+                    console.log('Pattern test result (Unicode):', /^[\p{L}\p{N}\s\-']+$/u.test(word));
+                    
+                    // Fallback pattern for broader browser compatibility
+                    const compatiblePattern = /^[a-zA-Z0-9\u00C0-\u017F\u1E00-\u1EFF\s\-']+$/;
+                    console.log('Pattern test result (Compatible):', compatiblePattern.test(word));
+                    
+                    // Check for invalid characters - Use compatible pattern for accented characters
+                    if (!compatiblePattern.test(word)) {
                         e.preventDefault();
                         this.showError($wordInput, 'Word contains invalid characters.');
                         return false;
@@ -117,9 +125,17 @@
                 const $input = $(e.currentTarget);
                 const word = $input.val().trim();
                 
+                // DEBUG: Log real-time validation
+                console.log('Real-time validating word:', word);
+                console.log('Real-time pattern test result (Unicode):', /^[\p{L}\p{N}\s\-']+$/u.test(word));
+                
+                // Fallback pattern for broader browser compatibility
+                const compatiblePattern = /^[a-zA-Z0-9\u00C0-\u017F\u1E00-\u1EFF\s\-']+$/;
+                console.log('Real-time pattern test result (Compatible):', compatiblePattern.test(word));
+                
                 if (word && word.length > 100) {
                     this.showError($input, 'Word is too long (maximum 100 characters).');
-                } else if (word && !/^[\w\s\-']+$/u.test(word)) {
+                } else if (word && !compatiblePattern.test(word)) {
                     this.showError($input, 'Invalid characters in word.');
                 } else {
                     this.clearError($input);
