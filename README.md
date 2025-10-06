@@ -4,7 +4,7 @@
 [![WordPress](https://img.shields.io/badge/WordPress-5.0+-blue.svg)](https://wordpress.org/)
 [![PHP](https://img.shields.io/badge/PHP-7.4+-purple.svg)](https://www.php.net/)
 [![Code Standards](https://img.shields.io/badge/Code_Standards-PSR--12-orange.svg)](https://www.php-fig.org/psr/psr-12/)
-
+[![GitHub](https://img.shields.io/badge/GitHub-gl0bal01-181717?logo=github&logoColor=white)](https://github.com/gl0bal01)
 
 ## 🚀 Philosophy
 
