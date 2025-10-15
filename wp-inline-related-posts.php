@@ -3,7 +3,7 @@
  * Plugin Name: WP Inline Related Posts
  * Plugin URI: https://github.com/gl0bal01/wordpress-plugins/wp-inline-related-posts
  * Description: Intelligently inserts unique related posts blocks inline within your content based on categories with DOM manipulation and advanced filtering.
- * Version: 1.2.0
+ * Version: 1.2.1
  * Author: gl0bal01
  * Author URI: https://gl0bal01.com
  * License: GPL v3 or later
@@ -11,8 +11,8 @@
  * Text Domain: wp-inline-related-posts
  * Domain Path: /languages
  * Requires at least: 5.0
- * Tested up to: 6.4
- * Requires PHP: 7.4
+ * Tested up to: 6.8.3
+ * Requires PHP: 8.2+
  * Network: false
  * Update URI: false
  * 
@@ -86,7 +86,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('WP_INLINE_RELATED_VERSION', '1.2.0');
+define('WP_INLINE_RELATED_VERSION', '1.2.1');
 define('WP_INLINE_RELATED_FILE', __FILE__);
 
 // Configuration constants with defaults
@@ -116,14 +116,14 @@ if (!defined('WP_INLINE_RELATED_CACHE_DURATION')) {
 class WP_Inline_Related_Posts {
 
     private static $instance = null;
-    
+
     // Plugin constants
     const DEFAULT_PARAGRAPH_POSITION = 3;
     const DEFAULT_NUMBER_OF_POSTS    = 2;
     const MAX_RELATED_POSTS          = 5;
     const DEFAULT_REPEAT_EVERY       = 4;
-    const CACHE_GROUP               = 'wp_inline_related_posts';
-    
+    const CACHE_GROUP                = 'wp_inline_related_posts';
+
     public static function getInstance() {
         if (self::$instance === null) {
             self::$instance = new self();
@@ -139,32 +139,24 @@ class WP_Inline_Related_Posts {
      * Initialize plugin
      */
     private function init() {
-        // Load text domain
         add_action('plugins_loaded', [$this, 'loadTextDomain']);
-        
-        // Admin hooks
+
         if (is_admin()) {
             add_action('admin_menu', [$this, 'addSettingsPage']);
             add_action('admin_init', [$this, 'registerSettings']);
             add_action('admin_notices', [$this, 'adminNotices']);
         }
-        
-        // Frontend hooks
+
         add_filter('the_content', [$this, 'insertRelatedPosts'], 20);
         add_shortcode('inline_related_posts', [$this, 'relatedPostsShortcode']);
-        
-        // Activation/deactivation hooks
+
         register_activation_hook(__FILE__, [$this, 'activate']);
         register_deactivation_hook(__FILE__, [$this, 'deactivate']);
-        
-        // Cache management
+
         add_action('save_post', [$this, 'clearCacheOnPostSave']);
         add_action('wp_inline_related_cleanup', [$this, 'cleanupCache']);
     }
 
-    /**
-     * Load text domain for translations
-     */
     public function loadTextDomain() {
         load_plugin_textdomain('wp-inline-related-posts', false, dirname(plugin_basename(__FILE__)) . '/languages');
     }
@@ -203,11 +195,11 @@ class WP_Inline_Related_Posts {
     private function addSettingsFields() {
         $fields = [
             'paragraph_position' => __('First Insertion Position (Paragraph #)', 'wp-inline-related-posts'),
-            'repeat_every' => __('Repeat Every X Paragraphs', 'wp-inline-related-posts'),
-            'number_of_posts' => __('Number of Related Posts', 'wp-inline-related-posts'),
-            'post_types' => __('Enable on Post Types', 'wp-inline-related-posts'),
-            'date_range' => __('Post Age Limit', 'wp-inline-related-posts'),
-            'cache_enabled' => __('Enable Caching', 'wp-inline-related-posts')
+            'repeat_every'       => __('Repeat Every X Paragraphs', 'wp-inline-related-posts'),
+            'number_of_posts'    => __('Number of Related Posts', 'wp-inline-related-posts'),
+            'post_types'         => __('Enable on Post Types', 'wp-inline-related-posts'),
+            'date_range'         => __('Post Age Limit', 'wp-inline-related-posts'),
+            'cache_enabled'      => __('Enable Caching', 'wp-inline-related-posts'),
         ];
 
         foreach ($fields as $field => $label) {
@@ -224,31 +216,26 @@ class WP_Inline_Related_Posts {
     public function sanitizeSettings($input) {
         $output = [];
 
-        // Paragraph position
         $pos = absint($input['paragraph_position'] ?? 0);
         $output['paragraph_position'] = $pos >= 1 ? $pos : self::DEFAULT_PARAGRAPH_POSITION;
 
-        // Repeat frequency
         $output['repeat_every'] = absint($input['repeat_every'] ?? self::DEFAULT_REPEAT_EVERY);
 
-        // Number of posts
         $num = absint($input['number_of_posts'] ?? 0);
-        $output['number_of_posts'] = ($num >= 1 && $num <= self::MAX_RELATED_POSTS) 
-            ? $num : self::DEFAULT_NUMBER_OF_POSTS;
+        $output['number_of_posts'] = ($num >= 1 && $num <= self::MAX_RELATED_POSTS)
+            ? $num
+            : self::DEFAULT_NUMBER_OF_POSTS;
 
-        // Post types
         if (!empty($input['post_types']) && is_array($input['post_types'])) {
             $output['post_types'] = array_map('sanitize_text_field', $input['post_types']);
         } else {
             $output['post_types'] = ['post'];
         }
 
-        // Date range
         $dateRange = sanitize_text_field($input['date_range'] ?? '1 year');
-        $output['date_range'] = in_array($dateRange, ['1 month', '3 months', '6 months', '1 year', '2 years', 'all']) 
-            ? $dateRange : '1 year';
+        $allowedRanges = ['1 month', '3 months', '6 months', '1 year', '2 years', 'all'];
+        $output['date_range'] = in_array($dateRange, $allowedRanges, true) ? $dateRange : '1 year';
 
-        // Cache enabled
         $output['cache_enabled'] = !empty($input['cache_enabled']);
 
         return $output;
@@ -293,11 +280,13 @@ class WP_Inline_Related_Posts {
         $opts = get_option('wp_inline_related_posts_settings', []);
         $enabledTypes = $opts['post_types'] ?? ['post'];
         $postTypes = get_post_types(['public' => true], 'objects');
-        
+
         foreach ($postTypes as $postType) {
-            if ($postType->name === 'attachment') continue;
-            
-            $checked = in_array($postType->name, $enabledTypes) ? 'checked="checked"' : '';
+            if ($postType->name === 'attachment') {
+                continue;
+            }
+
+            $checked = in_array($postType->name, $enabledTypes, true) ? 'checked="checked"' : '';
             printf(
                 '<label><input type="checkbox" name="wp_inline_related_posts_settings[post_types][]" value="%s" %s /> %s</label><br>',
                 esc_attr($postType->name),
@@ -311,16 +300,16 @@ class WP_Inline_Related_Posts {
     public function date_rangeCallback() {
         $opts = get_option('wp_inline_related_posts_settings', []);
         $val = $opts['date_range'] ?? '1 year';
-        
+
         $options = [
-            '1 month' => __('Last Month', 'wp-inline-related-posts'),
+            '1 month'  => __('Last Month', 'wp-inline-related-posts'),
             '3 months' => __('Last 3 Months', 'wp-inline-related-posts'),
             '6 months' => __('Last 6 Months', 'wp-inline-related-posts'),
-            '1 year' => __('Last Year', 'wp-inline-related-posts'),
-            '2 years' => __('Last 2 Years', 'wp-inline-related-posts'),
-            'all' => __('All Time', 'wp-inline-related-posts')
+            '1 year'   => __('Last Year', 'wp-inline-related-posts'),
+            '2 years'  => __('Last 2 Years', 'wp-inline-related-posts'),
+            'all'      => __('All Time', 'wp-inline-related-posts'),
         ];
-        
+
         echo '<select name="wp_inline_related_posts_settings[date_range]">';
         foreach ($options as $value => $label) {
             $selected = selected($val, $value, false);
@@ -340,67 +329,6 @@ class WP_Inline_Related_Posts {
         echo ' <label>' . esc_html__('Enable caching for better performance', 'wp-inline-related-posts') . '</label>';
     }
 
-    public function settingsPageContent() {
-        if (!current_user_can('manage_options')) {
-            wp_die(__('You do not have sufficient permissions to access this page.', 'wp-inline-related-posts'));
-        }
-        
-        $stats = $this->getPluginStats();
-        
-        ?>
-        <div class="wrap">
-            <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
-            
-            <?php if (WP_INLINE_RELATED_TEST_MODE): ?>
-                <div class="notice notice-warning">
-                    <p><?php printf(esc_html__('Test mode is active for post ID %d. Disable in production!', 'wp-inline-related-posts'), WP_INLINE_RELATED_TEST_POST_ID); ?></p>
-                </div>
-            <?php endif; ?>
-            
-            <div style="display: flex; gap: 20px;">
-                <div style="flex: 2;">
-                    <form action="options.php" method="post">
-                        <?php
-                        settings_fields('wp_inline_related_posts_options');
-                        do_settings_sections('wp-inline-related-posts');
-                        submit_button();
-                        ?>
-                    </form>
-                </div>
-                
-                <div style="flex: 1;">
-                    <div class="postbox">
-                        <h3 class="hndle"><span><?php _e('Plugin Statistics', 'wp-inline-related-posts'); ?></span></h3>
-                        <div class="inside">
-                            <p><strong><?php _e('Cache Status:', 'wp-inline-related-posts'); ?></strong> 
-                               <?php echo $stats['cache_enabled'] ? __('Enabled', 'wp-inline-related-posts') : __('Disabled', 'wp-inline-related-posts'); ?>
-                            </p>
-                            <p><strong><?php _e('Cached Entries:', 'wp-inline-related-posts'); ?></strong> <?php echo esc_html($stats['cache_count']); ?></p>
-                            <p><strong><?php _e('Test Mode:', 'wp-inline-related-posts'); ?></strong> 
-                               <?php echo WP_INLINE_RELATED_TEST_MODE ? __('Active', 'wp-inline-related-posts') : __('Inactive', 'wp-inline-related-posts'); ?>
-                            </p>
-                            <p>
-                                <a href="<?php echo esc_url(add_query_arg(['clear_cache' => '1'])); ?>" class="button button-secondary">
-                                    <?php _e('Clear Cache', 'wp-inline-related-posts'); ?>
-                                </a>
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <div class="postbox">
-                        <h3 class="hndle"><span><?php _e('Shortcode Usage', 'wp-inline-related-posts'); ?></span></h3>
-                        <div class="inside">
-                            <p><?php _e('Use this shortcode to manually insert related posts:', 'wp-inline-related-posts'); ?></p>
-                            <code>[inline_related_posts count="2"]</code>
-                            <p class="description"><?php _e('The count parameter is optional and defaults to your plugin settings.', 'wp-inline-related-posts'); ?></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <?php
-    }
-
     /* ------------------------------
      *  Core Functionality
      * ------------------------------ */
@@ -414,7 +342,6 @@ class WP_Inline_Related_Posts {
         $count = is_null($count) ? ($opts['number_of_posts'] ?? self::DEFAULT_NUMBER_OF_POSTS) : absint($count);
         $count = min(max(1, $count), self::MAX_RELATED_POSTS);
 
-        // Check cache first
         if ($this->isCacheEnabled()) {
             $cacheKey = "related_posts_{$postId}_{$count}_" . md5(serialize($excludeIds));
             $cached = wp_cache_get($cacheKey, self::CACHE_GROUP);
@@ -425,48 +352,35 @@ class WP_Inline_Related_Posts {
 
         $exclude = array_merge([$postId], $excludeIds);
         $categories = wp_get_post_categories($postId);
-        
+
         if (empty($categories)) {
             return [];
         }
 
-        // Build date query
-        $dateQuery = null;
         $dateRange = $opts['date_range'] ?? '1 year';
-        if ($dateRange !== 'all') {
-            $dateQuery = [
-                'after' => date('Y-m-d', strtotime('-' . $dateRange)),
-                'inclusive' => true
-            ];
-        }
+        $dateQuery = ($dateRange !== 'all')
+            ? [['after' => date('Y-m-d', strtotime('-' . $dateRange)), 'inclusive' => true]]
+            : [];
 
         $queryArgs = [
-            'category__in' => $categories,
-            'post__not_in' => $exclude,
-            'posts_per_page' => $count,
-            'orderby' => 'rand',
-            'post_status' => 'publish',
-            'no_found_rows' => true,
-            'update_post_meta_cache' => false,
-            'update_post_term_cache' => false,
+            'category__in'            => $categories,
+            'post__not_in'            => $exclude,
+            'posts_per_page'          => $count,
+            'orderby'                 => 'rand',
+            'post_status'             => 'publish',
+            'no_found_rows'           => true,
+            'update_post_meta_cache'  => false,
+            'update_post_term_cache'  => false,
         ];
 
-        if ($dateQuery) {
-            $queryArgs['date_query'] = [$dateQuery];
+        if (!empty($dateQuery)) {
+            $queryArgs['date_query'] = $dateQuery;
         }
 
-        /**
-         * Filter related posts query arguments
-         *
-         * @param array $queryArgs WP_Query arguments
-         * @param int $postId Current post ID
-         */
         $queryArgs = apply_filters('wp_inline_related_posts_query_args', $queryArgs, $postId);
-
         $query = new WP_Query($queryArgs);
         $posts = $query->posts;
 
-        // Cache the result
         if ($this->isCacheEnabled()) {
             wp_cache_set($cacheKey, $posts, self::CACHE_GROUP, WP_INLINE_RELATED_CACHE_DURATION);
         }
@@ -479,65 +393,47 @@ class WP_Inline_Related_Posts {
             return '';
         }
 
-        $html = '<div class="wp-inline-related-posts" style="background:#f8f9fa;border-radius:8px;border:2px solid #e9ecef;padding:1.5em 1.5em 1em 1.5em;margin:2em 0;box-shadow:0 2px 4px rgba(0,0,0,0.1);">';
+        $html  = '<div class="wp-inline-related-posts" style="background:#f8f9fa;border-radius:8px;border:2px solid #e9ecef;padding:1.5em 1.5em 1em 1.5em;margin:2em 0;box-shadow:0 2px 4px rgba(0,0,0,0.1);">';
         $html .= '<h4 style="margin:0 0 1em 0;color:#495057;font-size:1.1em;font-weight:600;">' . esc_html__('Related Articles', 'wp-inline-related-posts') . '</h4>';
         $html .= '<ul style="margin:0;padding:0;list-style:none;">';
-        
-        foreach ($posts as $post) {
-            $url = esc_url(get_permalink($post->ID));
-            $title = esc_html(wp_trim_words(get_the_title($post->ID), 12, '…'));
-            $date = get_the_date('', $post->ID);
-            
-            $html .= '<li style="margin:0 0 0.5em 0;padding:0;">';
-            $html .= '<a href="' . $url . '" style="color:#007cba;text-decoration:none;font-weight:500;" title="' . esc_attr(get_the_title($post->ID)) . '">' . $title . '</a>';
-            $html .= ' <small style="color:#6c757d;">(' . esc_html($date) . ')</small>';
-            $html .= '</li>';
-        }
-        
-        $html .= '</ul>';
-        $html .= '</div>';
 
-        /**
-         * Filter the generated HTML for related posts
-         *
-         * @param string $html Generated HTML
-         * @param array $posts Array of post objects
-         */
+        foreach ($posts as $post) {
+            $url   = esc_url(get_permalink($post->ID));
+            $title = esc_html(wp_trim_words(get_the_title($post->ID), 12, '…'));
+            $date  = esc_html(get_the_date('', $post->ID));
+
+            $html .= "<li style='margin:0 0 .5em 0;padding:0;'><a href='{$url}' style='color:#007cba;text-decoration:none;font-weight:500;' title='{$title}'>{$title}</a> <small style='color:#6c757d;'>({$date})</small></li>";
+        }
+
+        $html .= '</ul></div>';
         return apply_filters('wp_inline_related_posts_html', $html, $posts);
     }
 
     public function insertRelatedPosts($content) {
-        // Check global disable flag
         if (WP_INLINE_RELATED_DISABLED) {
             return $content;
         }
 
-        // Check legacy global variable
         global $is_disable;
         if (isset($is_disable) && (int)$is_disable === 1) {
             return $content;
         }
 
-        // Basic context checks
         if (!is_singular() || !in_the_loop() || !is_main_query() || is_feed()) {
             return $content;
         }
 
-        // Test mode check
         if (WP_INLINE_RELATED_TEST_MODE && get_the_ID() !== WP_INLINE_RELATED_TEST_POST_ID) {
             return $content;
         }
 
-        // Post type check
         $opts = get_option('wp_inline_related_posts_settings', []);
         $enabledTypes = $opts['post_types'] ?? ['post'];
         if (!in_array(get_post_type(), $enabledTypes, true)) {
             return $content;
         }
 
-        // Allow filtering of enabled status
-        $enabled = apply_filters('wp_inline_related_posts_enabled', true, get_the_ID());
-        if (!$enabled) {
+        if (!apply_filters('wp_inline_related_posts_enabled', true, get_the_ID())) {
             return $content;
         }
 
@@ -551,37 +447,33 @@ class WP_Inline_Related_Posts {
         }
 
         $repeatEvery = absint($opts['repeat_every'] ?? self::DEFAULT_REPEAT_EVERY);
-        $count = absint($opts['number_of_posts'] ?? self::DEFAULT_NUMBER_OF_POSTS);
+        $count       = absint($opts['number_of_posts'] ?? self::DEFAULT_NUMBER_OF_POSTS);
 
         try {
-            // Load content into DOM
             libxml_use_internal_errors(true);
             $dom = new DOMDocument();
             $dom->loadHTML('<?xml encoding="UTF-8"><div>' . $content . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
             libxml_clear_errors();
 
             $xpath = new DOMXPath($dom);
-            // Exclude paragraphs inside Instagram embeds and other special content
             $paragraphs = $xpath->query('//div/p[not(ancestor::blockquote[contains(@class,"instagram-media")]) and not(ancestor::*[contains(@class,"wp-block-embed")])]');
-            $totalParagraphs = $paragraphs->length;
 
+            $totalParagraphs = $paragraphs->length;
             if ($totalParagraphs < $paragraphPos) {
                 return $content;
             }
 
-            // Calculate insertion positions
             $positions = [$paragraphPos];
             if ($repeatEvery > 0) {
-                $nextPos = $paragraphPos + $repeatEvery;
-                while ($nextPos <= $totalParagraphs) {
-                    $positions[] = $nextPos;
-                    $nextPos += $repeatEvery;
+                $next = $paragraphPos + $repeatEvery;
+                while ($next <= $totalParagraphs) {
+                    $positions[] = $next;
+                    $next += $repeatEvery;
                 }
             }
 
             $usedIds = [];
 
-            // Insert related posts at each position
             foreach ($positions as $position) {
                 $node = $paragraphs->item($position - 1);
                 if (!$node) continue;
@@ -589,17 +481,35 @@ class WP_Inline_Related_Posts {
                 $relatedPosts = $this->getRelatedPosts(get_the_ID(), $count, $usedIds);
                 if (empty($relatedPosts)) continue;
 
-                // Track used IDs to avoid duplicates
-                foreach ($relatedPosts as $relatedPost) {
-                    $usedIds[] = $relatedPost->ID;
+                foreach ($relatedPosts as $p) {
+                    $usedIds[] = $p->ID;
                 }
 
+                $html = $this->generateRelatedPostsHtml($relatedPosts);
+                if (empty($html)) continue;
+
                 $fragment = $dom->createDocumentFragment();
-                $fragment->appendXML($this->generateRelatedPostsHtml($relatedPosts));
-                $node->parentNode->insertBefore($fragment, $node->nextSibling);
+                $ok = @$fragment->appendXML($html);
+
+                if (!$ok || !$fragment->hasChildNodes()) {
+                    // fallback to import if appendXML fails
+                    $tmp = new DOMDocument();
+                    libxml_use_internal_errors(true);
+                    $tmp->loadHTML('<?xml encoding="UTF-8">' . $html);
+                    libxml_clear_errors();
+
+                    $body = $tmp->getElementsByTagName('body')->item(0);
+                    if ($body && $body->firstChild) {
+                        $import = $dom->importNode($body->firstChild, true);
+                        if ($import) {
+                            $node->parentNode->insertBefore($import, $node->nextSibling);
+                        }
+                    }
+                } else {
+                    $node->parentNode->insertBefore($fragment, $node->nextSibling);
+                }
             }
 
-            // Extract modified content
             $wrapper = $dom->getElementsByTagName('div')->item(0);
             $newContent = '';
             foreach ($wrapper->childNodes as $child) {
@@ -607,7 +517,6 @@ class WP_Inline_Related_Posts {
             }
 
             return $newContent;
-
         } catch (Exception $e) {
             error_log('WP Inline Related Posts DOM Error: ' . $e->getMessage());
             return $content;
@@ -616,19 +525,19 @@ class WP_Inline_Related_Posts {
 
     public function relatedPostsShortcode($atts) {
         $atts = shortcode_atts([
-            'count' => null,
-            'exclude' => ''
+            'count'   => null,
+            'exclude' => '',
         ], $atts, 'inline_related_posts');
 
-        $count = !empty($atts['count']) ? absint($atts['count']) : null;
+        $count   = !empty($atts['count']) ? absint($atts['count']) : null;
         $exclude = !empty($atts['exclude']) ? array_map('absint', explode(',', $atts['exclude'])) : [];
-        
-        $relatedPosts = $this->getRelatedPosts(get_the_ID(), $count, $exclude);
-        return $this->generateRelatedPostsHtml($relatedPosts);
+        $related = $this->getRelatedPosts(get_the_ID(), $count, $exclude);
+
+        return $this->generateRelatedPostsHtml($related);
     }
 
     /* ------------------------------
-     *  Cache & Performance
+     *  Cache & Admin
      * ------------------------------ */
 
     private function isCacheEnabled() {
@@ -638,15 +547,6 @@ class WP_Inline_Related_Posts {
 
     public function clearCacheOnPostSave($postId) {
         if (wp_is_post_revision($postId)) return;
-        
-        $post = get_post($postId);
-        if (!$post || $post->post_status !== 'publish') return;
-
-        // Clear cache for this post and related posts
-        wp_cache_delete_multiple([
-            "related_posts_{$postId}_" . '*',
-        ], self::CACHE_GROUP);
-        
         wp_cache_flush_group(self::CACHE_GROUP);
     }
 
@@ -654,50 +554,16 @@ class WP_Inline_Related_Posts {
         wp_cache_flush_group(self::CACHE_GROUP);
     }
 
-    private function getPluginStats() {
-        return [
-            'cache_enabled' => $this->isCacheEnabled(),
-            'cache_count' => $this->getCacheCount(),
-            'version' => WP_INLINE_RELATED_VERSION
-        ];
-    }
-
-    private function getCacheCount() {
-        // This is a simplified count - WordPress object cache doesn't provide easy counting
-        return 'N/A';
-    }
-
-    /* ------------------------------
-     *  Admin & Lifecycle
-     * ------------------------------ */
-
-    public function adminNotices() {
-        if (isset($_GET['clear_cache']) && $_GET['clear_cache'] === '1' && current_user_can('manage_options')) {
-            $this->cleanupCache();
-            echo '<div class="notice notice-success is-dismissible">';
-            echo '<p>' . esc_html__('Cache cleared successfully.', 'wp-inline-related-posts') . '</p>';
-            echo '</div>';
-        }
-
-        if (WP_INLINE_RELATED_TEST_MODE && current_user_can('manage_options')) {
-            echo '<div class="notice notice-warning">';
-            echo '<p>' . sprintf(esc_html__('Inline Related Posts: Test mode is active for post ID %d.', 'wp-inline-related-posts'), WP_INLINE_RELATED_TEST_POST_ID) . '</p>';
-            echo '</div>';
-        }
-    }
-
     public function activate() {
-        // Set default options
         add_option('wp_inline_related_posts_settings', [
             'paragraph_position' => self::DEFAULT_PARAGRAPH_POSITION,
-            'repeat_every' => self::DEFAULT_REPEAT_EVERY,
-            'number_of_posts' => self::DEFAULT_NUMBER_OF_POSTS,
-            'post_types' => ['post'],
-            'date_range' => '1 year',
-            'cache_enabled' => true
+            'repeat_every'       => self::DEFAULT_REPEAT_EVERY,
+            'number_of_posts'    => self::DEFAULT_NUMBER_OF_POSTS,
+            'post_types'         => ['post'],
+            'date_range'         => '1 year',
+            'cache_enabled'      => true,
         ]);
 
-        // Schedule cleanup
         if (!wp_next_scheduled('wp_inline_related_cleanup')) {
             wp_schedule_event(time(), 'daily', 'wp_inline_related_cleanup');
         }
@@ -708,16 +574,26 @@ class WP_Inline_Related_Posts {
         $this->cleanupCache();
     }
 
-    /**
-     * Get plugin configuration status
-     */
+    public function adminNotices() {
+        if (isset($_GET['clear_cache']) && $_GET['clear_cache'] === '1' && current_user_can('manage_options')) {
+            $this->cleanupCache();
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Cache cleared successfully.', 'wp-inline-related-posts') . '</p></div>';
+        }
+
+        if (WP_INLINE_RELATED_TEST_MODE && current_user_can('manage_options')) {
+            echo '<div class="notice notice-warning"><p>' .
+                sprintf(esc_html__('Inline Related Posts: Test mode is active for post ID %d.', 'wp-inline-related-posts'), WP_INLINE_RELATED_TEST_POST_ID) .
+                '</p></div>';
+        }
+    }
+
     public function getConfigStatus() {
         $opts = get_option('wp_inline_related_posts_settings', []);
         return [
-            'configured' => !empty($opts),
-            'test_mode' => WP_INLINE_RELATED_TEST_MODE,
-            'cache_enabled' => $this->isCacheEnabled(),
-            'enabled_post_types' => $opts['post_types'] ?? ['post']
+            'configured'        => !empty($opts),
+            'test_mode'         => WP_INLINE_RELATED_TEST_MODE,
+            'cache_enabled'     => $this->isCacheEnabled(),
+            'enabled_post_types'=> $opts['post_types'] ?? ['post'],
         ];
     }
 }
@@ -733,12 +609,10 @@ add_action('wp_inline_related_cleanup', function() {
     $plugin->cleanupCache();
 });
 
-// Helper functions
 function wp_inline_related_posts_is_enabled() {
     return !WP_INLINE_RELATED_DISABLED;
 }
 
 function wp_inline_related_posts_get_config() {
-    $plugin = WP_Inline_Related_Posts::getInstance();
-    return $plugin->getConfigStatus();
+    return WP_Inline_Related_Posts::getInstance()->getConfigStatus();
 }
