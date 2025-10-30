@@ -4,17 +4,18 @@
  * Plugin Name: Affiliate PrettyLink Generator
  * Plugin URI: https://github.com/gl0bal01/wordpress-plugins/wp-affiliate-prettylink-generator
  * Description: A powerful WordPress plugin that automatically detects affiliate platforms and generates Pretty Links with proper tracking parameters for various affiliate networks.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: gl0bal01
  * Author URI: https://gl0bal01.com
  * Text Domain: wp-affiliate-prettylink-generator
  * Domain Path: /languages
  * Requires at least: 5.0
- * Tested up to: 6.4
+ * Tested up to: 6.7
  * Requires PHP: 7.4
  * Network: false
  * Update URI: false
  * Created: 2019-12-16
+ * Updated: 2025-01-30
  * !!! BACKUP FILE – DO NOT USE IN PRODUCTION. This file is intended for backup purposes only. You must review and modify it to suit your specific requirements before use.
  */
 
@@ -35,7 +36,7 @@ class AffiliateeLinkGenerator
      * 
      * @var string
      */
-    public const VERSION = '1.0.0';
+    public const VERSION = '1.0.1';
 
     /**
      * Plugin text domain
@@ -59,18 +60,25 @@ class AffiliateeLinkGenerator
     public const MIN_PHP_VERSION = '7.4';
 
     /**
+     * Maximum AJAX requests per hour per user
+     * 
+     * @var int
+     */
+    private const MAX_REQUESTS_PER_HOUR = 100;
+
+    /**
      * Single instance of the plugin
      * 
      * @var AffiliateeLinkGenerator|null
      */
-    private static ?AffiliateeLinkGenerator $instance = null;
+    private static $instance = null;
 
     /**
      * Affiliate platform configurations
      * 
      * @var array<string, array>
      */
-    private array $platforms = [];
+    private $platforms = [];
 
     /**
      * Plugin constructor
@@ -89,7 +97,7 @@ class AffiliateeLinkGenerator
      * @since 1.0.0
      * @return AffiliateeLinkGenerator
      */
-    public static function getInstance(): AffiliateeLinkGenerator
+    public static function getInstance()
     {
         if (self::$instance === null) {
             self::$instance = new self();
@@ -103,17 +111,34 @@ class AffiliateeLinkGenerator
      * @since 1.0.0
      * @return void
      */
-    private function initHooks(): void
+    private function initHooks()
     {
         add_action('plugins_loaded', [$this, 'checkDependencies']);
         add_action('init', [$this, 'loadTextDomain']);
         
         // Only initialize if Pretty Link is active
-        if (is_plugin_active('pretty-link/pretty-link.php')) {
+        if ($this->isPrettyLinkActive()) {
             add_action('add_meta_boxes', [$this, 'addMetaBox']);
             add_action('admin_enqueue_scripts', [$this, 'enqueueAdminScripts']);
             add_action('wp_ajax_generate_affiliate_link', [$this, 'handleAjaxRequest']);
         }
+    }
+
+    /**
+     * Check if Pretty Link plugin is active and functions are available
+     * 
+     * @since 1.0.1
+     * @return bool
+     */
+    private function isPrettyLinkActive()
+    {
+        if (!function_exists('is_plugin_active')) {
+            include_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+        
+        return is_plugin_active('pretty-link/pretty-link.php') && 
+               function_exists('prli_create_pretty_link') && 
+               function_exists('prli_get_pretty_link_url');
     }
 
     /**
@@ -122,9 +147,9 @@ class AffiliateeLinkGenerator
      * @since 1.0.0
      * @return void
      */
-    public function checkDependencies(): void
+    public function checkDependencies()
     {
-        if (!is_plugin_active('pretty-link/pretty-link.php')) {
+        if (!$this->isPrettyLinkActive()) {
             add_action('admin_notices', [$this, 'showPrettyLinkNotice']);
             return;
         }
@@ -146,7 +171,7 @@ class AffiliateeLinkGenerator
      * @since 1.0.0
      * @return void
      */
-    public function loadTextDomain(): void
+    public function loadTextDomain()
     {
         load_plugin_textdomain(
             self::TEXT_DOMAIN,
@@ -161,38 +186,40 @@ class AffiliateeLinkGenerator
      * This method centralizes all platform configurations.
      * To add a new platform, simply add it to this array.
      * 
+     * ⚠️ IMPORTANT: Replace example affiliate IDs with your actual IDs before use!
+     * 
      * @since 1.0.0
      * @return void
      */
-    private function definePlatforms(): void
+    private function definePlatforms()
     {
         $this->platforms = [
             'adtraction' => [
                 'domains' => ['oma-and-me.com'],
-                'url_template' => 'https://at.oma-and-me.com/t/t?a=12345678&as=12345678&t=2&tk=1&url=%s',
+                'url_template' => 'https://at.oma-and-me.com/t/t?a=YOUR_ADTRACTION_ID&as=YOUR_ADTRACTION_AS&t=2&tk=1&url=%s',
                 'name' => __('Adtraction', self::TEXT_DOMAIN),
                 'type' => 'prepend_url'
             ],
             'zanox' => [
                 'domains' => ['zalando.be', 'kiabi.be', 'orcanta.'],
                 'programs' => [
-                    'zalando.be' => 12345678,
-                    'kiabi.be' => 12345678,
-                    'orcanta.' => 12345678
+                    'zalando.be' => 0, // Replace with actual program ID
+                    'kiabi.be' => 0,   // Replace with actual program ID
+                    'orcanta.' => 0    // Replace with actual program ID
                 ],
                 'name' => __('Zanox', self::TEXT_DOMAIN),
                 'type' => 'api_deeplink'
             ],
             'amazon' => [
                 'domains' => ['amazon.com', 'amazon.co.uk', 'amazon.fr', 'amazon.de'],
-                'parameter' => 'tag=your-amazon-tag',
+                'parameter' => 'tag=YOUR-AMAZON-TAG-20', // Replace with your Amazon Associate tag
                 'name' => __('Amazon Associates', self::TEXT_DOMAIN),
                 'type' => 'append_parameter'
             ],
             'awin' => [
                 'domains' => ['example-awin-merchant.com'],
-                'url_template' => 'https://www.awin1.com/cread.php?awinmid=%s&awinaffid=12345678&ued=%s',
-                'merchant_id' => '12345', // Replace with actual merchant ID
+                'url_template' => 'https://www.awin1.com/cread.php?awinmid=%s&awinaffid=YOUR_AWIN_ID&ued=%s',
+                'merchant_id' => '0', // Replace with actual merchant ID
                 'name' => __('Awin', self::TEXT_DOMAIN),
                 'type' => 'template_with_merchant'
             ]
@@ -214,21 +241,25 @@ class AffiliateeLinkGenerator
      * @since 1.0.0
      * @return void
      */
-    public function addMetaBox(): void
+    public function addMetaBox()
     {
         // Check user capability
         if (!current_user_can('edit_posts')) {
             return;
         }
 
-        add_meta_box(
-            'affiliate-link-generator',
-            __('Affiliate Link Generator', self::TEXT_DOMAIN),
-            [$this, 'renderMetaBox'],
-            'post',
-            'side',
-            'default'
-        );
+        $post_types = ['post', 'page']; // Add more post types as needed
+        
+        foreach ($post_types as $post_type) {
+            add_meta_box(
+                'affiliate-link-generator',
+                __('Affiliate Link Generator', self::TEXT_DOMAIN),
+                [$this, 'renderMetaBox'],
+                $post_type,
+                'side',
+                'default'
+            );
+        }
     }
 
     /**
@@ -238,7 +269,7 @@ class AffiliateeLinkGenerator
      * @param WP_Post $post The current post object
      * @return void
      */
-    public function renderMetaBox(WP_Post $post): void
+    public function renderMetaBox($post)
     {
         // Create nonce for security
         wp_nonce_field('affiliate_link_generator_meta_box', 'affiliate_link_generator_nonce');
@@ -255,6 +286,8 @@ class AffiliateeLinkGenerator
                     type="text" 
                     class="widefat"
                     placeholder="<?php esc_attr_e('e.g., Kiabi - Jasmine dress', self::TEXT_DOMAIN); ?>"
+                    maxlength="200"
+                    autocomplete="off"
                 >
                 <span class="howto">
                     <?php esc_html_e('Enter a descriptive name for your affiliate link', self::TEXT_DOMAIN); ?>
@@ -272,6 +305,7 @@ class AffiliateeLinkGenerator
                     class="widefat"
                     autocomplete="off"
                     placeholder="<?php esc_attr_e('https://example.com/product', self::TEXT_DOMAIN); ?>"
+                    maxlength="2048"
                 >
                 <span class="howto">
                     <?php esc_html_e('Enter the full URL you want to affiliate', self::TEXT_DOMAIN); ?>
@@ -335,6 +369,12 @@ class AffiliateeLinkGenerator
             border-radius: 3px;
             margin: 5px 0;
         }
+        .alg-copy-link {
+            font-size: 11px;
+            height: auto;
+            line-height: 1.5;
+            padding: 3px 8px;
+        }
         </style>
         <?php
     }
@@ -346,10 +386,11 @@ class AffiliateeLinkGenerator
      * @param string $hook_suffix The current admin page hook suffix
      * @return void
      */
-    public function enqueueAdminScripts(string $hook_suffix): void
+    public function enqueueAdminScripts($hook_suffix)
     {
         // Only load on post edit screens
-        if (!in_array($hook_suffix, ['post.php', 'post-new.php'], true)) {
+        $allowed_hooks = ['post.php', 'post-new.php'];
+        if (!in_array($hook_suffix, $allowed_hooks, true)) {
             return;
         }
 
@@ -361,15 +402,16 @@ class AffiliateeLinkGenerator
         
         // Localize script data
         $script_data = [
-            'ajax_url' => admin_url('admin-ajax.php'),
+            'ajax_url' => esc_url(admin_url('admin-ajax.php')),
             'nonce' => $nonce,
             'strings' => [
-                'generating' => __('Generating link...', self::TEXT_DOMAIN),
-                'error' => __('Error generating link. Please try again.', self::TEXT_DOMAIN),
-                'invalid_url' => __('Please enter a valid URL.', self::TEXT_DOMAIN),
-                'invalid_name' => __('Please enter a link name.', self::TEXT_DOMAIN),
-                'copy_success' => __('Link copied to clipboard!', self::TEXT_DOMAIN),
-                'copy_error' => __('Failed to copy link.', self::TEXT_DOMAIN)
+                'generating' => esc_js(__('Generating link...', self::TEXT_DOMAIN)),
+                'error' => esc_js(__('Error generating link. Please try again.', self::TEXT_DOMAIN)),
+                'invalid_url' => esc_js(__('Please enter a valid URL.', self::TEXT_DOMAIN)),
+                'invalid_name' => esc_js(__('Please enter a link name.', self::TEXT_DOMAIN)),
+                'copy_success' => esc_js(__('Link copied to clipboard!', self::TEXT_DOMAIN)),
+                'copy_error' => esc_js(__('Failed to copy link.', self::TEXT_DOMAIN)),
+                'rate_limit' => esc_js(__('Too many requests. Please wait a moment and try again.', self::TEXT_DOMAIN))
             ]
         ];
 
@@ -384,7 +426,7 @@ class AffiliateeLinkGenerator
      * @param array $data Localized script data
      * @return string
      */
-    private function getInlineScript(array $data): string
+    private function getInlineScript(array $data)
     {
         $json_data = wp_json_encode($data);
         
@@ -392,8 +434,15 @@ class AffiliateeLinkGenerator
         jQuery(document).ready(function($) {
             const algData = {$json_data};
             
+            // Debounce function to prevent double-clicks
+            let isProcessing = false;
+            
             $('#alg_generate_link').on('click', function(e) {
                 e.preventDefault();
+                
+                if (isProcessing) {
+                    return;
+                }
                 
                 const linkName = $('#alg_link_name').val().trim();
                 const targetUrl = $('#alg_target_url').val().trim();
@@ -415,7 +464,17 @@ class AffiliateeLinkGenerator
                     return;
                 }
                 
+                // Validate URL format
+                try {
+                    new URL(targetUrl);
+                } catch (e) {
+                    alert(algData.strings.invalid_url);
+                    $('#alg_target_url').focus();
+                    return;
+                }
+                
                 // Show loading state
+                isProcessing = true;
                 button.prop('disabled', true).text(algData.strings.generating);
                 spinner.addClass('is-active');
                 resultField.removeClass('has-content').hide();
@@ -435,25 +494,46 @@ class AffiliateeLinkGenerator
                         // Add copy functionality to generated links
                         resultField.find('.alg-copy-link').on('click', function() {
                             const linkText = $(this).data('link');
-                            navigator.clipboard.writeText(linkText).then(function() {
-                                alert(algData.strings.copy_success);
-                            }).catch(function() {
-                                alert(algData.strings.copy_error);
-                            });
+                            if (navigator.clipboard && navigator.clipboard.writeText) {
+                                navigator.clipboard.writeText(linkText).then(function() {
+                                    alert(algData.strings.copy_success);
+                                }).catch(function() {
+                                    alert(algData.strings.copy_error);
+                                });
+                            } else {
+                                // Fallback for older browsers
+                                const textArea = document.createElement('textarea');
+                                textArea.value = linkText;
+                                textArea.style.position = 'fixed';
+                                textArea.style.left = '-999999px';
+                                document.body.appendChild(textArea);
+                                textArea.select();
+                                try {
+                                    document.execCommand('copy');
+                                    alert(algData.strings.copy_success);
+                                } catch (err) {
+                                    alert(algData.strings.copy_error);
+                                }
+                                document.body.removeChild(textArea);
+                            }
                         });
                     } else {
-                        resultField.html('<div class=\"notice notice-error\"><p>' + 
-                            (response.data.message || algData.strings.error) + '</p></div>')
+                        const errorMsg = response.data && response.data.message ? response.data.message : algData.strings.error;
+                        resultField.html('<div class=\"notice notice-error\"><p>' + $('<div>').text(errorMsg).html() + '</p></div>')
                             .addClass('has-content').show();
                     }
                 })
-                .fail(function() {
-                    resultField.html('<div class=\"notice notice-error\"><p>' + 
-                        algData.strings.error + '</p></div>')
+                .fail(function(jqXHR) {
+                    let errorMsg = algData.strings.error;
+                    if (jqXHR.status === 429) {
+                        errorMsg = algData.strings.rate_limit;
+                    }
+                    resultField.html('<div class=\"notice notice-error\"><p>' + $('<div>').text(errorMsg).html() + '</p></div>')
                         .addClass('has-content').show();
                 })
                 .always(function() {
                     // Reset loading state
+                    isProcessing = false;
                     button.prop('disabled', false).text('" . esc_js(__('Generate Affiliate Link', self::TEXT_DOMAIN)) . "');
                     spinner.removeClass('is-active');
                 });
@@ -463,19 +543,45 @@ class AffiliateeLinkGenerator
     }
 
     /**
+     * Check rate limit for current user
+     * 
+     * @since 1.0.1
+     * @return bool True if within rate limit, false otherwise
+     */
+    private function checkRateLimit()
+    {
+        $user_id = get_current_user_id();
+        $transient_key = 'alg_rate_limit_' . $user_id;
+        $request_count = get_transient($transient_key);
+        
+        if ($request_count === false) {
+            set_transient($transient_key, 1, HOUR_IN_SECONDS);
+            return true;
+        }
+        
+        if ($request_count >= self::MAX_REQUESTS_PER_HOUR) {
+            return false;
+        }
+        
+        set_transient($transient_key, $request_count + 1, HOUR_IN_SECONDS);
+        return true;
+    }
+
+    /**
      * Handle AJAX request for generating affiliate links
      * 
      * @since 1.0.0
      * @return void
      */
-    public function handleAjaxRequest(): void
+    public function handleAjaxRequest()
     {
         try {
             // Verify nonce for security
-            if (!isset($_POST['nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['nonce'])), 'affiliate_link_generator_ajax')) {
+            $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
+            if (!wp_verify_nonce($nonce, 'affiliate_link_generator_ajax')) {
                 wp_send_json_error([
                     'message' => __('Security check failed. Please refresh the page and try again.', self::TEXT_DOMAIN)
-                ]);
+                ], 403);
                 return;
             }
 
@@ -483,7 +589,15 @@ class AffiliateeLinkGenerator
             if (!current_user_can('edit_posts')) {
                 wp_send_json_error([
                     'message' => __('You do not have permission to perform this action.', self::TEXT_DOMAIN)
-                ]);
+                ], 403);
+                return;
+            }
+
+            // Check rate limit
+            if (!$this->checkRateLimit()) {
+                wp_send_json_error([
+                    'message' => __('Too many requests. Please wait a moment and try again.', self::TEXT_DOMAIN)
+                ], 429);
                 return;
             }
 
@@ -492,10 +606,36 @@ class AffiliateeLinkGenerator
             $target_url = isset($_POST['target_url']) ? esc_url_raw(wp_unslash($_POST['target_url'])) : '';
             $disable_affiliation = isset($_POST['disable_affiliation']) && $_POST['disable_affiliation'] === 'true';
 
+            // Validate required fields
             if (empty($link_name) || empty($target_url)) {
                 wp_send_json_error([
                     'message' => __('Both link name and target URL are required.', self::TEXT_DOMAIN)
-                ]);
+                ], 400);
+                return;
+            }
+
+            // Validate link name length
+            if (strlen($link_name) > 200) {
+                wp_send_json_error([
+                    'message' => __('Link name is too long. Maximum 200 characters allowed.', self::TEXT_DOMAIN)
+                ], 400);
+                return;
+            }
+
+            // Validate URL format
+            if (!filter_var($target_url, FILTER_VALIDATE_URL)) {
+                wp_send_json_error([
+                    'message' => __('Invalid URL format. Please enter a valid URL.', self::TEXT_DOMAIN)
+                ], 400);
+                return;
+            }
+
+            // Check URL scheme (only http/https allowed)
+            $parsed_url = wp_parse_url($target_url);
+            if (!isset($parsed_url['scheme']) || !in_array($parsed_url['scheme'], ['http', 'https'], true)) {
+                wp_send_json_error([
+                    'message' => __('Invalid URL scheme. Only HTTP and HTTPS are allowed.', self::TEXT_DOMAIN)
+                ], 400);
                 return;
             }
 
@@ -511,13 +651,18 @@ class AffiliateeLinkGenerator
             } else {
                 wp_send_json_error([
                     'message' => $result['message']
-                ]);
+                ], 500);
             }
 
         } catch (Exception $e) {
+            // Log error for debugging (don't expose to user)
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Affiliate Link Generator Error: ' . $e->getMessage());
+            }
+            
             wp_send_json_error([
                 'message' => __('An unexpected error occurred. Please try again.', self::TEXT_DOMAIN)
-            ]);
+            ], 500);
         }
     }
 
@@ -530,10 +675,15 @@ class AffiliateeLinkGenerator
      * @param bool $disable_affiliation Whether to disable affiliation
      * @return array Result array with success status and data
      */
-    private function generateAffiliateLink(string $target_url, string $link_name, bool $disable_affiliation): array
+    private function generateAffiliateLink($target_url, $link_name, $disable_affiliation)
     {
         // Generate slug for pretty link
         $slug = 'go/' . sanitize_title_with_dashes(remove_accents($link_name));
+        
+        // Ensure slug is not too long
+        if (strlen($slug) > 200) {
+            $slug = substr($slug, 0, 200);
+        }
 
         // Detect platform if affiliation is enabled
         $platform_data = $disable_affiliation ? false : $this->detectPlatform($target_url);
@@ -558,29 +708,45 @@ class AffiliateeLinkGenerator
         }
 
         // Create or get existing pretty link
-        global $prli_link;
-        
-        if (!$prli_link) {
+        if (!function_exists('prli_create_pretty_link') || !function_exists('prli_get_pretty_link_url')) {
             return [
                 'success' => false,
-                'message' => __('Pretty Link plugin is not properly initialized.', self::TEXT_DOMAIN)
+                'message' => __('Pretty Link functions are not available. Please ensure Pretty Link plugin is active.', self::TEXT_DOMAIN)
             ];
         }
 
-        // Check if link already exists or create new one
-        $link_id = $prli_link->find_first_target_url($final_url);
-        if (!$link_id) {
-            $link_id = prli_create_pretty_link($final_url, $slug, $link_name);
-        }
-
-        if (!$link_id) {
+        // Check if link with same slug already exists
+        global $wpdb;
+        $prli_link_table = $wpdb->prefix . 'prli_links';
+        
+        // Check if table exists
+        $table_exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $prli_link_table)) === $prli_link_table;
+        
+        if (!$table_exists) {
             return [
                 'success' => false,
-                'message' => __('Failed to create pretty link. Please check Pretty Link plugin configuration.', self::TEXT_DOMAIN)
+                'message' => __('Pretty Link database tables not found. Please reinstall Pretty Link plugin.', self::TEXT_DOMAIN)
+            ];
+        }
+
+        // Try to create the link
+        $link_id = prli_create_pretty_link($final_url, $slug, $link_name);
+
+        if (!$link_id || is_wp_error($link_id)) {
+            return [
+                'success' => false,
+                'message' => __('Failed to create pretty link. The slug may already exist or there may be a configuration issue.', self::TEXT_DOMAIN)
             ];
         }
 
         $pretty_link_url = prli_get_pretty_link_url($link_id);
+        
+        if (!$pretty_link_url) {
+            return [
+                'success' => false,
+                'message' => __('Failed to generate pretty link URL.', self::TEXT_DOMAIN)
+            ];
+        }
 
         // Generate HTML output
         $html = $this->generateResultHtml($pretty_link_url, $final_url, $platform_name, $platform_data !== false);
@@ -596,18 +762,29 @@ class AffiliateeLinkGenerator
     /**
      * Detect affiliate platform from URL
      * 
+     * PHP 7.4 compatible - returns array or false
+     * 
      * @since 1.0.0
      * @param string $url The URL to analyze
      * @return array|false Platform data if detected, false otherwise
      */
-    private function detectPlatform(string $url): array|false
+    private function detectPlatform($url)
     {
+        // Validate URL
+        if (empty($url) || !is_string($url)) {
+            return false;
+        }
+
         foreach ($this->platforms as $platform_key => $platform_config) {
-            if (!isset($platform_config['domains'])) {
+            if (!isset($platform_config['domains']) || !is_array($platform_config['domains'])) {
                 continue;
             }
 
             foreach ($platform_config['domains'] as $domain) {
+                if (!is_string($domain) || empty($domain)) {
+                    continue;
+                }
+                
                 if (strpos($url, $domain) !== false) {
                     return [
                         'platform_key' => $platform_key,
@@ -629,29 +806,62 @@ class AffiliateeLinkGenerator
      * @param array $platform_data Platform configuration data
      * @return array Result with success status and generated URL
      */
-    private function generatePlatformAffiliateUrl(string $target_url, array $platform_data): array
+    private function generatePlatformAffiliateUrl($target_url, array $platform_data)
     {
+        if (!isset($platform_data['platform_config']) || !isset($platform_data['platform_key'])) {
+            return [
+                'success' => false,
+                'message' => __('Invalid platform configuration.', self::TEXT_DOMAIN)
+            ];
+        }
+
         $platform_config = $platform_data['platform_config'];
         $platform_key = $platform_data['platform_key'];
 
+        if (!isset($platform_config['type'])) {
+            return [
+                'success' => false,
+                'message' => __('Platform type not specified.', self::TEXT_DOMAIN)
+            ];
+        }
+
         switch ($platform_config['type']) {
             case 'prepend_url':
+                if (!isset($platform_config['url_template'])) {
+                    return [
+                        'success' => false,
+                        'message' => sprintf(__('URL template not configured for platform: %s', self::TEXT_DOMAIN), esc_html($platform_config['name']))
+                    ];
+                }
                 return [
                     'success' => true,
                     'url' => sprintf($platform_config['url_template'], urlencode($target_url))
                 ];
 
             case 'append_parameter':
+                if (!isset($platform_config['parameter'])) {
+                    return [
+                        'success' => false,
+                        'message' => sprintf(__('Parameter not configured for platform: %s', self::TEXT_DOMAIN), esc_html($platform_config['name']))
+                    ];
+                }
                 return [
                     'success' => true,
                     'url' => $this->appendParameter($target_url, $platform_config['parameter'])
                 ];
 
             case 'template_with_merchant':
-                if (!isset($platform_config['merchant_id'])) {
+                if (!isset($platform_config['merchant_id']) || !isset($platform_config['url_template'])) {
                     return [
                         'success' => false,
-                        'message' => sprintf(__('Merchant ID not configured for platform: %s', self::TEXT_DOMAIN), $platform_config['name'])
+                        'message' => sprintf(__('Merchant ID or URL template not configured for platform: %s', self::TEXT_DOMAIN), esc_html($platform_config['name']))
+                    ];
+                }
+                // Check if merchant ID is placeholder
+                if ($platform_config['merchant_id'] === '0' || $platform_config['merchant_id'] === 0) {
+                    return [
+                        'success' => false,
+                        'message' => sprintf(__('Please configure merchant ID for platform: %s', self::TEXT_DOMAIN), esc_html($platform_config['name']))
                     ];
                 }
                 return [
@@ -665,7 +875,7 @@ class AffiliateeLinkGenerator
             default:
                 return [
                     'success' => false,
-                    'message' => sprintf(__('Unknown platform type: %s', self::TEXT_DOMAIN), $platform_config['type'])
+                    'message' => sprintf(__('Unknown platform type: %s', self::TEXT_DOMAIN), esc_html($platform_config['type']))
                 ];
         }
     }
@@ -678,28 +888,48 @@ class AffiliateeLinkGenerator
      * @param array $platform_data Platform configuration
      * @return array Result with success status and URL
      */
-    private function generateZanoxDeeplink(string $target_url, array $platform_data): array
+    private function generateZanoxDeeplink($target_url, array $platform_data)
     {
-        // This would require Zanox API credentials to be configured
-        // For now, return a basic implementation
+        if (!isset($platform_data['platform_config']) || !isset($platform_data['matched_domain'])) {
+            return [
+                'success' => false,
+                'message' => __('Invalid Zanox configuration.', self::TEXT_DOMAIN)
+            ];
+        }
+
         $platform_config = $platform_data['platform_config'];
         $matched_domain = $platform_data['matched_domain'];
 
         if (!isset($platform_config['programs'][$matched_domain])) {
             return [
                 'success' => false,
-                'message' => sprintf(__('No program ID configured for domain: %s', self::TEXT_DOMAIN), $matched_domain)
+                'message' => sprintf(__('No program ID configured for domain: %s', self::TEXT_DOMAIN), esc_html($matched_domain))
             ];
         }
 
         $program_id = $platform_config['programs'][$matched_domain];
         
-        // In a real implementation, you would make an API call to Zanox here
-        // For this example, we'll return a basic deeplink format
-        $deeplink_url = add_query_arg([
+        // Check if program ID is placeholder
+        if ($program_id === 0 || $program_id === '0') {
+            return [
+                'success' => false,
+                'message' => sprintf(__('Please configure program ID for domain: %s', self::TEXT_DOMAIN), esc_html($matched_domain))
+            ];
+        }
+        
+        /**
+         * In a production implementation, you would make an API call to Zanox here.
+         * Example API endpoint: https://api.zanox.com/json/2011-03-01/createdeeplink
+         * 
+         * For now, we'll return a basic deeplink format.
+         * Replace this with actual Zanox API integration.
+         */
+        $deeplink_params = [
             'zanox_program' => $program_id,
-            'zanox_url' => urlencode($target_url)
-        ], 'https://example.zanox-deeplink.com/');
+            'zanox_url' => $target_url
+        ];
+        
+        $deeplink_url = add_query_arg($deeplink_params, 'https://ad.zanox.com/ppc/');
 
         return [
             'success' => true,
@@ -715,8 +945,12 @@ class AffiliateeLinkGenerator
      * @param string $parameter The parameter to append
      * @return string The modified URL
      */
-    private function appendParameter(string $url, string $parameter): string
+    private function appendParameter($url, $parameter)
     {
+        if (empty($url) || empty($parameter)) {
+            return $url;
+        }
+
         $separator = (strpos($url, '?') !== false) ? '&' : '?';
         return $url . $separator . $parameter;
     }
@@ -728,7 +962,7 @@ class AffiliateeLinkGenerator
      * @param string $url The base URL
      * @return string URL with UTM parameters
      */
-    private function addUtmParameters(string $url): string
+    private function addUtmParameters($url)
     {
         // Check if UTM parameters already exist
         if (strpos($url, 'utm_source') !== false) {
@@ -738,7 +972,7 @@ class AffiliateeLinkGenerator
         $utm_params = [
             'utm_source' => 'thebodyoptimist',
             'utm_medium' => 'article',
-            'utm_campaign' => 'date_' . date('m-d-y')
+            'utm_campaign' => 'date_' . gmdate('m-d-y')
         ];
 
         $separator = (strpos($url, '?') !== false) ? '&' : '?';
@@ -755,7 +989,7 @@ class AffiliateeLinkGenerator
      * @param bool $platform_detected Whether a platform was detected
      * @return string HTML output
      */
-    private function generateResultHtml(string $pretty_link_url, string $final_url, string $platform_name, bool $platform_detected): string
+    private function generateResultHtml($pretty_link_url, $final_url, $platform_name, $platform_detected)
     {
         $html = '<div class="alg-result-content">';
         
@@ -770,7 +1004,7 @@ class AffiliateeLinkGenerator
         $html .= sprintf(
             '<div class="alg-generated-link">
                 <strong>%s:</strong><br>
-                <a href="%s" target="_blank" rel="nofollow">%s</a>
+                <a href="%s" target="_blank" rel="nofollow noopener">%s</a>
                 <button type="button" class="button button-small alg-copy-link" data-link="%s" style="margin-left: 10px;">%s</button>
             </div>',
             esc_html__('Pretty Link', self::TEXT_DOMAIN),
@@ -800,7 +1034,7 @@ class AffiliateeLinkGenerator
      * @since 1.0.0
      * @return void
      */
-    public function showPrettyLinkNotice(): void
+    public function showPrettyLinkNotice()
     {
         ?>
         <div class="notice notice-error">
@@ -823,7 +1057,7 @@ class AffiliateeLinkGenerator
      * @since 1.0.0
      * @return void
      */
-    public function showPhpVersionNotice(): void
+    public function showPhpVersionNotice()
     {
         ?>
         <div class="notice notice-error">
@@ -833,8 +1067,8 @@ class AffiliateeLinkGenerator
                     /* translators: %1$s: Plugin name, %2$s: Required PHP version, %3$s: Current PHP version */
                     esc_html__('%1$s requires PHP %2$s or higher. You are running PHP %3$s.', self::TEXT_DOMAIN),
                     '<strong>' . esc_html__('Affiliate Link Generator', self::TEXT_DOMAIN) . '</strong>',
-                    self::MIN_PHP_VERSION,
-                    PHP_VERSION
+                    esc_html(self::MIN_PHP_VERSION),
+                    esc_html(PHP_VERSION)
                 );
                 ?>
             </p>
@@ -848,7 +1082,7 @@ class AffiliateeLinkGenerator
      * @since 1.0.0
      * @return void
      */
-    public function showWpVersionNotice(): void
+    public function showWpVersionNotice()
     {
         ?>
         <div class="notice notice-error">
@@ -858,8 +1092,8 @@ class AffiliateeLinkGenerator
                     /* translators: %1$s: Plugin name, %2$s: Required WordPress version, %3$s: Current WordPress version */
                     esc_html__('%1$s requires WordPress %2$s or higher. You are running WordPress %3$s.', self::TEXT_DOMAIN),
                     '<strong>' . esc_html__('Affiliate Link Generator', self::TEXT_DOMAIN) . '</strong>',
-                    self::MIN_WP_VERSION,
-                    get_bloginfo('version')
+                    esc_html(self::MIN_WP_VERSION),
+                    esc_html(get_bloginfo('version'))
                 );
                 ?>
             </p>
@@ -873,7 +1107,7 @@ class AffiliateeLinkGenerator
      * @since 1.0.0
      * @return string Example code
      */
-    public static function getNewPlatformExample(): string
+    public static function getNewPlatformExample()
     {
         return '
 /**
@@ -915,10 +1149,11 @@ add_filter("affiliate_link_generator_platforms", function($platforms) {
 // Initialize the plugin
 AffiliateeLinkGenerator::getInstance();
 
-// Display example for developers in admin
+// Display example for developers in admin (with proper sanitization)
 if (is_admin() && current_user_can('manage_options')) {
     add_action('admin_footer', function() {
-        if (isset($_GET['page']) && $_GET['page'] === 'affiliate-link-generator-help') {
+        $page = isset($_GET['page']) ? sanitize_text_field(wp_unslash($_GET['page'])) : '';
+        if ($page === 'affiliate-link-generator-help') {
             echo '<pre style="background: #f1f1f1; padding: 20px; margin: 20px; overflow-x: auto;">';
             echo esc_html(AffiliateeLinkGenerator::getNewPlatformExample());
             echo '</pre>';
